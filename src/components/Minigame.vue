@@ -31,6 +31,9 @@ import {
   DIFFICULTY_TO_FISH_TYPE, 
   DIFFICULTY_TO_FISH_SPEED,
 } from '../../public/globals'
+import { onBeforeUnmount } from 'vue'
+
+
 
 export default {
   name: 'Minigame',
@@ -60,12 +63,12 @@ export default {
     }
   },
   watch: {
-    visible(newVal) {
-      if (newVal) {
+    visible() {
+      if (this.visible) {
         this.fish.speed = DIFFICULTY_TO_FISH_SPEED[this.difficulty]
         this.fish.isLegend = DIFFICULTY_TO_FISH_TYPE[this.difficulty] == 'legend'
         this.startPolling()
-      } else {
+      } else if (!this.visible) {
         this.stopPolling()
       }
     }
@@ -76,7 +79,6 @@ export default {
         const res = await fetch('http://localhost:8081/get_mini_game_info')
         if (res.ok) {
           const data = await res.json()
-          console.log('Minigame info:', data)
           this.processCatchBarInfo(data.catchBarInfo)
           this.processFishInfo(data.fishInfo)
           this.processProgressBarInfo(data.progressBarInfo)
@@ -86,8 +88,7 @@ export default {
       }
     },
     startPolling() {
-      if (this.timer) return; // evita múltiples timers
-      this.timer = setInterval(() => {
+      this.timer = setInterval(async () => {
         this.get_mini_game_info()
       }, GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY)
     },
@@ -108,6 +109,7 @@ export default {
       this.fish.lastSwapPosition = info.lastSwapPosition
     },
     processProgressBarInfo(info) {
+      console.log('Progress Bar Info:', info)
       if (info.state !== 'in_progress') {
         this.$emit('finished', info.state === 'successful')
         this.stopPolling()
@@ -124,7 +126,7 @@ export default {
       this.startPolling()
     }
   },
-  beforeDestroy() {
+  onBeforeUnmount() {
     this.stopPolling()
   }
 }
