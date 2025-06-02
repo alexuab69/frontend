@@ -19,17 +19,32 @@
     />
   </BaseMinigame>
 </template>
-
 <script>
+const DIFFICULTY_TO_FISH_SPEED = {
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  legend: 4
+}
+import BaseMinigame from '@/base_components/BaseMinigame.vue'
+import BaseCatchBar from '@/base_components/BaseCatchBar.vue'
+import BaseFish from '@/base_components/BaseFish.vue'
+import BaseProgressBar from '@/base_components/BaseProgressBar.vue'
+
 export default {
   name: 'Minigame',
+  components: {
+    BaseMinigame,
+    BaseCatchBar,
+    BaseFish,
+    BaseProgressBar
+  },
   props: {
     visible: Boolean,
     difficulty: String
   },
   data() {
     return {
-      ws: null,
       interval: null,
       catchBar: { direction: '', lastSwapAt: 0, lastSwapPosition: 0 },
       fish: { direction: '', lastSwapAt: 0, lastSwapPosition: 0, speed: 0, isLegend: false },
@@ -42,29 +57,29 @@ export default {
     }
   },
   watch: {
-    visible(newVal, oldVal) {
-      if (newVal && !this.ws) {
+    visible(newVal) {
+      if (newVal) {
         this.startPolling()
+      } else {
+        clearInterval(this.interval)
+        this.interval = null
       }
     }
   },
-  mounted() {
-    this.ws = new WebSocket('ws://localhost:8080')
-    this.ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.catchBar) this.processCatchBarInfo(data.catchBar)
-      if (data.fish) this.processFishInfo(data.fish)
-      if (data.progressBar) this.processProgressBarInfo(data.progressBar)
-    }
-  },
   methods: {
-    startPolling() {
+    async startPolling() {
+      if (this.interval) return  // avoid multiple intervals
       this.interval = setInterval(async () => {
-        const res = await fetch('/get_mini_game_info')
-        const data = await res.json()
-        if (data.catchBar) this.processCatchBarInfo(data.catchBar)
-        if (data.fish) this.processFishInfo(data.fish)
-        if (data.progressBar) this.processProgressBarInfo(data.progressBar)
+        try {
+          const res = await fetch('/get_mini_game_info')
+          if (!res.ok) throw new Error('Network response not ok')
+          const data = await res.json()
+          if (data.catchBar) this.processCatchBarInfo(data.catchBar)
+          if (data.fish) this.processFishInfo(data.fish)
+          if (data.progressBar) this.processProgressBarInfo(data.progressBar)
+        } catch (err) {
+          console.error('Polling error:', err)
+        }
       }, 500)
     },
     processCatchBarInfo(info) {
@@ -79,7 +94,7 @@ export default {
         direction: info.direction,
         lastSwapAt: info.lastSwapAt,
         lastSwapPosition: info.lastSwapPosition,
-        speed: DIFFICULTY_TO_FISH_SPEED[this.difficulty],
+        speed: DIFFICULTY_TO_FISH_SPEED[this.difficulty] || 1,
         isLegend: this.difficulty === 'legend'
       }
     },
@@ -87,6 +102,7 @@ export default {
       if (info.state !== 'in_progress') {
         this.$emit('finished', info.state === 'success')
         clearInterval(this.interval)
+        this.interval = null
       } else {
         this.progress = {
           direction: info.direction,
@@ -95,6 +111,9 @@ export default {
         }
       }
     }
+  },
+  beforeUnmount() {
+    clearInterval(this.interval)
   }
 }
 </script>
