@@ -32,7 +32,7 @@ function Game() {
         playerState = "fish_bit";
 
         // resuelve la promesa creada en waitForBite notificando al frontend de que ha mordido el pez
-        if (resolveWaitForBite) resolveWaitForBite(); // NO ENTIENDO :,/
+        if (resolveWaitForBite) resolveWaitForBite();
 
         // segundo contador para que el pez escape. Vuelve a estado inicial
         fishEscapeTimer = setTimeout(() => {
@@ -77,7 +77,6 @@ function Game() {
       // Si ha picado
       if (playerState === "fish_bit") {
         playerState = "playing_minigame";
-
         // Ejecutar metodo start del objeto catchingMinigame
         const selectedDifficulty = ATTEMPTS_DIFFICULTY[attemptNumber];
         catchingMinigame.start(selectedDifficulty);

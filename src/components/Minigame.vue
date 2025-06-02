@@ -71,9 +71,7 @@ export default {
       if (this.interval) return  // avoid multiple intervals
       this.interval = setInterval(async () => {
         try {
-          let domain = window.location.origin;
-          let port = 8081;
-          let url = `${domain}:${port}/get_mini_game_info`;
+          let url = `http://localhost:8081/get_mini_game_info`;
 
           const res = await fetch(url)
           if (!res.ok) throw new Error('Network response not ok')

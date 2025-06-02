@@ -62,17 +62,16 @@ const attempts = ref([])
 const lastCapturedDifficulty = ref('')
 let biteTimeout = null
 
-watch(() => enableActionButtonTrigger, () => {
-  isActionButtonDisabled.value = false
+watch(() => enableActionButtonTrigger.value, () => {
+  actionButtonDisabled.value = false
 })
 
-watch(() => showCaughtFishTrigger, () => {
+watch(() => showCaughtFishTrigger.value, () => {
   showCaughtFish.value = true
 })
 
 const handleActionButtonClick = async () => {
   if (minigameVisible.value || actionButtonDisabled.value) return
-  debugger
   switch (actionButtonText.value.toLowerCase()) {
     case 'cast':
       showCaughtFish.value = false
@@ -80,6 +79,7 @@ const handleActionButtonClick = async () => {
       break
 
     case 'start':
+      
       await reelIn()
       break
 
@@ -97,7 +97,6 @@ const castLine = async () => {
   if (res.ok) {
     emit('setPlayerState', 'casting')
     actionButtonText.value = 'start'
-    actionButtonDisabled.value = true
     await waitForBite()
   }
 }
@@ -109,7 +108,7 @@ const waitForBite = async () => {
     if (biteTimeout) clearTimeout(biteTimeout)
     biteTimeout = setTimeout(() => {
       if (!minigameVisible.value) {
-        emit('setPlayerState', 'reeling_in')
+        emit('setPlayerState', 'standing')
         emit('setCapturedFish', '')
         actionButtonText.value = 'cast'
         actionButtonDisabled.value = true
@@ -122,7 +121,7 @@ const reelIn = async () => {
   const res = await fetch(`${BASE_URL}/reel_in`)
   const data = await res.json()
 
-  if (!res.ok && data.errorCode === 'standing') {
+  if (!res.ok && data.errorCode === 'line_cast') {
     emit('setPlayerState', 'reeling_in')
     emit('setCapturedFish', '')
     actionButtonText.value = 'cast'
@@ -153,7 +152,7 @@ const handleButtonReleased = async () => {
 
 const onMinigameFinished = (successful) => {
   minigameVisible.value = false
-  emit('setPlayerState', 'reeling_in')
+  emit('setPlayerState', 'standing')
 
   const fishId = successful
     ? DIFFICULTY_TO_FISH_TYPE[lastCapturedDifficulty.value]
