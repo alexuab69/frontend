@@ -71,7 +71,11 @@ export default {
       if (this.interval) return  // avoid multiple intervals
       this.interval = setInterval(async () => {
         try {
-          const res = await fetch('/get_mini_game_info')
+          let domain = window.location.origin;
+          let port = 8081;
+          let url = `${domain}:${port}/get_mini_game_info`;
+
+          const res = await fetch(url)
           if (!res.ok) throw new Error('Network response not ok')
           const data = await res.json()
           if (data.catchBar) this.processCatchBarInfo(data.catchBar)

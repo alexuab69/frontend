@@ -35,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import BaseCaptures from '@/base_components/BaseCaptures.vue'
 import BaseAttempt from '@/base_components/BaseAttempt.vue'
 import BaseYellowIndicator from '@/base_components/BaseYellowIndicator.vue'
@@ -51,6 +51,8 @@ import { enableActionButtonTrigger, showCaughtFishTrigger } from './App.vue'
 
 const emit = defineEmits(['setPlayerState', 'setCapturedFish'])
 
+const BASE_URL = 'http://localhost:8081'
+
 const minigameVisible = ref(false)
 const actionButtonText = ref('cast')
 const actionButtonDisabled = ref(false)
@@ -60,18 +62,12 @@ const attempts = ref([])
 const lastCapturedDifficulty = ref('')
 let biteTimeout = null
 
-// Reactively update actionButtonDisabled when enableActionButtonTrigger changes
-watchEffect(() => {
-  if (enableActionButtonTrigger.value) {
-    actionButtonDisabled.value = false
-  }
+watch(() => enableActionButtonTrigger, () => {
+  isActionButtonDisabled.value = false
 })
 
-// Reactively show caught fish dialog when trigger changes
-watchEffect(() => {
-  if (showCaughtFishTrigger.value) {
-    showCaughtFish.value = true
-  }
+watch(() => showCaughtFishTrigger, () => {
+  showCaughtFish.value = true
 })
 
 const handleActionButtonClick = async () => {
@@ -91,23 +87,23 @@ const handleActionButtonClick = async () => {
       showCaughtFish.value = false
       attempts.value = []
       emit('setCapturedFish', '')
-      actionButtonText.value = 'CAST'
+      actionButtonText.value = 'cast'
       break
   }
 }
 
 const castLine = async () => {
-  const res = await fetch('/cast_line')
+  const res = await fetch(`${BASE_URL}/cast_line`)
   if (res.ok) {
     emit('setPlayerState', 'casting')
-    actionButtonText.value = 'START'
+    actionButtonText.value = 'start'
     actionButtonDisabled.value = true
     await waitForBite()
   }
 }
 
 const waitForBite = async () => {
-  const res = await fetch('/wait_for_bite')
+  const res = await fetch(`${BASE_URL}/wait_for_bite`)
   if (res.ok) {
     yellowIndicatorTrigger.value++
     if (biteTimeout) clearTimeout(biteTimeout)
@@ -115,7 +111,7 @@ const waitForBite = async () => {
       if (!minigameVisible.value) {
         emit('setPlayerState', 'reeling_in')
         emit('setCapturedFish', '')
-        actionButtonText.value = 'CAST'
+        actionButtonText.value = 'cast'
         actionButtonDisabled.value = true
       }
     }, PULL_ROD_TIMEOUT_MS)
@@ -123,13 +119,13 @@ const waitForBite = async () => {
 }
 
 const reelIn = async () => {
-  const res = await fetch('/reel_in')
+  const res = await fetch(`${BASE_URL}/reel_in`)
   const data = await res.json()
 
   if (!res.ok && data.errorCode === 'standing') {
     emit('setPlayerState', 'reeling_in')
     emit('setCapturedFish', '')
-    actionButtonText.value = 'CAST'
+    actionButtonText.value = 'cast'
     actionButtonDisabled.value = true
     return
   }
@@ -138,20 +134,20 @@ const reelIn = async () => {
     minigameVisible.value = true
     lastCapturedDifficulty.value = data.difficulty
     emit('setPlayerState', 'playing')
-    actionButtonText.value = 'PULL'
+    actionButtonText.value = 'pull'
     actionButtonDisabled.value = false
   }
 }
 
 const handleButtonPressed = async () => {
   if (minigameVisible.value) {
-    await fetch('/move_catch_bar_up')
+    await fetch(`${BASE_URL}/move_catch_bar_up`)
   }
 }
 
 const handleButtonReleased = async () => {
   if (minigameVisible.value) {
-    await fetch('/stop_moving_catch_bar_up')
+    await fetch(`${BASE_URL}/stop_moving_catch_bar_up`)
   }
 }
 
@@ -164,7 +160,7 @@ const onMinigameFinished = (successful) => {
     : ''
   emit('setCapturedFish', fishId)
 
-  actionButtonText.value = 'CAST'
+  actionButtonText.value = 'cast'
   actionButtonDisabled.value = true
 
   attempts.value.push({
@@ -173,7 +169,7 @@ const onMinigameFinished = (successful) => {
   })
 
   if (attempts.value.length >= ATTEMPTS_DIFFICULTY.length) {
-    actionButtonText.value = 'RETRY'
+    actionButtonText.value = 'retry'
     actionButtonDisabled.value = false
   }
 }

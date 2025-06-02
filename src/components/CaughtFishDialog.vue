@@ -60,7 +60,10 @@ export default {
   methods: {
     startPolling() {
       this.interval = setInterval(async () => {
-        const res = await fetch('/get_mini_game_info')
+        let domain = window.location.origin;
+        let port = 8081;
+        let url = `${domain}:${port}/get_mini_game_info`;
+        const res = await fetch(url)
         const data = await res.json()
         if (data.catchBar) this.processCatchBarInfo(data.catchBar)
         if (data.fish) this.processFishInfo(data.fish)
