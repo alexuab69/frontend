@@ -14,21 +14,23 @@
   />
 </template>
   
-  
-<script setup>
-
+<script>
 export default {
   name: "App"
 };
+</script>
+  
+<script setup>
+
 
 import { ref } from 'vue'
 
 // Componentes base
-import BaseBackground from './base_components/BaseBackground.vue'
-import BasePlayer from './base_components/BasePlayer.vue'
+import BaseBackground from '../base_components/BaseBackground.vue'
+import BasePlayer from '../base_components/BasePlayer.vue'
 
 // Componentes propios
-import Hud from './components/Hud.vue'
+import Hud from '../components/Hud.vue'
 
 // Estado y funciones
 const playerState = ref('standing')
