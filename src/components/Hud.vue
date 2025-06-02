@@ -40,7 +40,7 @@ import BaseYellowIndicator from '../base_components/BaseYellowIndicator.vue'
 import BaseActionButton from '../base_components/BaseActionButton.vue'
 import CaughtFishDialog from './CaughtFishDialog.vue'
 import Minigame from './Minigame.vue'
-import {PULL_ROD_TIMEOUT_MS} from '../../public/globals.js'
+import { PULL_ROD_TIMEOUT_MS, DIFFICULTY_TO_FISH_TYPE, ATTEMPTS_DIFFICULTY } from '../../public/globals.js'
 // Props (triggers)
 const props = defineProps({
   enableActionButtonTrigger: Number,
@@ -51,7 +51,7 @@ const props = defineProps({
 const emit = defineEmits(['setPlayerState', 'setCapturedFish'])
 
 // Estado interno
-const actionButtonText = ref('CAST')
+const actionButtonText = ref('cast')
 const isActionButtonDisabled = ref(false)
 const isMinigameVisible = ref(false)
 const showCaughtFish = ref(false)
@@ -73,7 +73,7 @@ function onMinigameFinished(success) {
   isMinigameVisible.value = false
   emit('setPlayerState', 'reeling_in')
   emit('setCapturedFish', success ? DIFFICULTY_TO_FISH_TYPE[minigameDifficulty.value] : '')
-  actionButtonText.value = 'CAST'
+  actionButtonText.value = 'cast'
   isActionButtonDisabled.value = true
 
   attempts.value.push({
@@ -82,20 +82,20 @@ function onMinigameFinished(success) {
   })
 
   if (attempts.value.length >= ATTEMPTS_DIFFICULTY.length) {
-    actionButtonText.value = 'RETRY'
+    actionButtonText.value = 'retry'
   }
 }
 
 async function onActionButtonClick() {
   if (isActionButtonDisabled.value || isMinigameVisible.value) return
 
-  if (actionButtonText.value === 'CAST') {
+  if (actionButtonText.value === 'cast') {
     showCaughtFish.value = false
 
     const response = await fetch('/cast_line')
     if (response.ok) {
       emit('setPlayerState', 'casting')
-      actionButtonText.value = 'START'
+      actionButtonText.value = 'start'
       isActionButtonDisabled.value = true
 
       const waitRes = await fetch('/wait_for_bite')
@@ -106,7 +106,7 @@ async function onActionButtonClick() {
           if (!isMinigameVisible.value) {
             emit('setPlayerState', 'reeling_in')
             emit('setCapturedFish', '')
-            actionButtonText.value = 'CAST'
+            actionButtonText.value = 'cast'
             isActionButtonDisabled.value = true
           }
         }, PULL_ROD_TIMEOUT_MS)
@@ -114,28 +114,28 @@ async function onActionButtonClick() {
     }
   }
 
-  else if (actionButtonText.value === 'START') {
+  else if (actionButtonText.value === 'start') {
     const response = await fetch('/reel_in')
     const data = await response.json()
 
     if (data.errorCode === 'standing') {
       emit('setPlayerState', 'reeling_in')
       emit('setCapturedFish', '')
-      actionButtonText.value = 'CAST'
+      actionButtonText.value = 'cast'
       isActionButtonDisabled.value = true
     } else if (data.difficulty) {
       emit('setPlayerState', 'playing')
       isMinigameVisible.value = true
       minigameDifficulty.value = data.difficulty
-      actionButtonText.value = 'PULL'
+      actionButtonText.value = 'pull'
     }
   }
 
-  else if (actionButtonText.value === 'RETRY') {
+  else if (actionButtonText.value === 'retry') {
     showCaughtFish.value = false
     attempts.value = []
     emit('setCapturedFish', '')
-    actionButtonText.value = 'CAST'
+    actionButtonText.value = 'cast'
   }
 }
 
