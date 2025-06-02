@@ -13,16 +13,8 @@
     @setCapturedFish="onSetCapturedFish"
   />
 </template>
-  
-<script>
-export default {
-  name: "App"
-};
-</script>
-  
+
 <script setup>
-
-
 import { ref } from 'vue'
 
 // Componentes base
@@ -32,13 +24,15 @@ import BasePlayer from '../base_components/BasePlayer.vue'
 // Componentes propios
 import Hud from '../components/Hud.vue'
 
-// Estado y funciones
+// Estado del jugador
 const playerState = ref('standing')
 const capturedFish = ref('')
+
+// Triggers reactivos para el componente Hud
 const enableActionButtonTrigger = ref(0)
 const showCaughtFishTrigger = ref(0)
 
-// Manejadores de eventos
+// Eventos emitidos por BasePlayer
 function onAnimationFinished() {
   enableActionButtonTrigger.value++
 }
@@ -47,6 +41,7 @@ function onShowingCaughtFish() {
   showCaughtFishTrigger.value++
 }
 
+// Eventos emitidos por Hud
 function onSetPlayerState(newState) {
   playerState.value = newState
 }
@@ -58,6 +53,6 @@ function onSetCapturedFish(fishId) {
 
 <style>
 img {
-    -webkit-user-drag: none;
+  -webkit-user-drag: none;
 }
 </style>
