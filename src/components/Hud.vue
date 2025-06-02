@@ -40,7 +40,7 @@ import BaseYellowIndicator from '../base_components/BaseYellowIndicator.vue'
 import BaseActionButton from '../base_components/BaseActionButton.vue'
 import CaughtFishDialog from './CaughtFishDialog.vue'
 import Minigame from './Minigame.vue'
-import PULL_ROD_TIMEOUT_MS from '../../public/globals'
+import {PULL_ROD_TIMEOUT_MS} from '../../public/globals.js'
 // Props (triggers)
 const props = defineProps({
   enableActionButtonTrigger: Number,
