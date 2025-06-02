@@ -108,7 +108,7 @@ const waitForBite = async () => {
     if (biteTimeout) clearTimeout(biteTimeout)
     biteTimeout = setTimeout(() => {
       if (!minigameVisible.value) {
-        emit('setPlayerState', 'standing')
+        emit('setPlayerState', 'reeling_in')
         emit('setCapturedFish', '')
         actionButtonText.value = 'cast'
         actionButtonDisabled.value = true

@@ -30,7 +30,7 @@ import BaseMinigame from '@/base_components/BaseMinigame.vue'
 import BaseCatchBar from '@/base_components/BaseCatchBar.vue'
 import BaseFish from '@/base_components/BaseFish.vue'
 import BaseProgressBar from '@/base_components/BaseProgressBar.vue'
-
+import {FISH_MAX_POS, GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY} from '../../public/globals'
 export default {
   name: 'Minigame',
   components: {
@@ -45,6 +45,9 @@ export default {
   },
   data() {
     return {
+      fishSimulatedPosition: FISH_MAX_POS,
+      fishSimulatedDirection: 'up',
+      fishAnimationInterval: null,
       interval: null,
       catchBar: { direction: '', lastSwapAt: 0, lastSwapPosition: 0 },
       fish: { direction: '', lastSwapAt: 0, lastSwapPosition: 0, speed: 0, isLegend: false },
@@ -57,19 +60,60 @@ export default {
     }
   },
   watch: {
-    visible(newVal) {
-      if (newVal) {
-        this.startPolling()
-      } else {
-        clearInterval(this.interval)
-        this.interval = null
-      }
+  visible(newVal) {
+    if (newVal) {
+      this.startPolling()
+      this.startFishAnimation() // ← add this
+    } else {
+      clearInterval(this.interval)
+      this.interval = null
+      clearInterval(this.fishAnimationInterval) // ← stop animation
+      this.fishAnimationInterval = null
+    }
     }
   },
   methods: {
+    startFishAnimation() {
+    if (this.fishAnimationInterval) return;
+
+    const SPEED = this.fish.speed || DIFFICULTY_TO_FISH_SPEED[this.difficulty]; // fallback to medium
+    const MIN_POS = 0;
+    const MAX_POS = FISH_MAX_POS;
+
+    this.fishSimulatedPosition = this.fish.lastSwapPosition || MAX_POS / 2;
+    this.fishSimulatedDirection = this.fish.direction || 'up';
+
+    this.fishAnimationInterval = setInterval(() => {
+      const now = Date.now();
+      const delta = this.fishSimulatedDirection === 'up' ? 1 : -1;
+      const movement = delta * SPEED * 1; // 75ms tick (sync with server polling)
+
+      let newPos = this.fishSimulatedPosition + movement;
+
+      // Clamp position and reverse direction
+      if (newPos > MAX_POS) {
+        newPos = MAX_POS;
+        this.fishSimulatedDirection = 'down';
+      } else if (newPos < MIN_POS) {
+        newPos = MIN_POS;
+        this.fishSimulatedDirection = 'up';
+      }
+
+      this.fishSimulatedPosition = newPos;
+
+      // Update fish object passed to BaseFish
+      this.fish = {
+        ...this.fish,
+        lastSwapPosition: newPos,
+        lastSwapAt: now,
+        direction: this.fishSimulatedDirection,
+      };
+    }, GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY); // 75ms
+  },
+
+
     async startPolling() {
-      if (this.interval) return  // avoid multiple intervals
-      this.interval = setInterval(async () => {
+      
         try {
           let url = `http://localhost:8081/get_mini_game_info`;
 
@@ -82,7 +126,6 @@ export default {
         } catch (err) {
           console.error('Polling error:', err)
         }
-      }, 500)
     },
     processCatchBarInfo(info) {
       this.catchBar = {
