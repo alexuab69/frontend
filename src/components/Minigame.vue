@@ -19,18 +19,19 @@
     />
   </BaseMinigame>
 </template>
+
 <script>
-const DIFFICULTY_TO_FISH_SPEED = {
-  easy: 1,
-  medium: 2,
-  hard: 3,
-  legend: 4
-}
 import BaseMinigame from '@/base_components/BaseMinigame.vue'
 import BaseCatchBar from '@/base_components/BaseCatchBar.vue'
 import BaseFish from '@/base_components/BaseFish.vue'
 import BaseProgressBar from '@/base_components/BaseProgressBar.vue'
-import {FISH_MAX_POS, GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY} from '../../public/globals'
+import {
+  FISH_MAX_POS,
+  GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY, 
+  DIFFICULTY_TO_FISH_TYPE, 
+  DIFFICULTY_TO_FISH_SPEED,
+} from '../../public/globals'
+
 export default {
   name: 'Minigame',
   components: {
@@ -45,120 +46,86 @@ export default {
   },
   data() {
     return {
-      fishSimulatedPosition: FISH_MAX_POS,
-      fishSimulatedDirection: 'up',
-      fishAnimationInterval: null,
-      interval: null,
+      spoolRotationType: 'clockwise',
       catchBar: { direction: '', lastSwapAt: 0, lastSwapPosition: 0 },
-      fish: { direction: '', lastSwapAt: 0, lastSwapPosition: 0, speed: 0, isLegend: false },
+      fish: {
+        direction: 'up',
+        lastSwapAt: Date.now(),
+        lastSwapPosition: FISH_MAX_POS / 2,
+        speed: DIFFICULTY_TO_FISH_SPEED[this.difficulty] || 1,
+        isLegend: DIFFICULTY_TO_FISH_TYPE[this.difficulty] == 'legend'
+      },
       progress: { direction: '', lastSwapAt: 0, lastSwapPosition: 0 },
-    }
-  },
-  computed: {
-    spoolRotationType() {
-      return this.progress.direction === 'up' ? 'clockwise' : 'anticlockwise'
+      timer: null,
     }
   },
   watch: {
-  visible(newVal) {
-    if (newVal) {
-      this.startPolling()
-      this.startFishAnimation() // ← add this
-    } else {
-      clearInterval(this.interval)
-      this.interval = null
-      clearInterval(this.fishAnimationInterval) // ← stop animation
-      this.fishAnimationInterval = null
-    }
+    visible(newVal) {
+      if (newVal) {
+        this.fish.speed = DIFFICULTY_TO_FISH_SPEED[this.difficulty]
+        this.fish.isLegend = DIFFICULTY_TO_FISH_TYPE[this.difficulty] == 'legend'
+        this.startPolling()
+      } else {
+        this.stopPolling()
+      }
     }
   },
   methods: {
-    startFishAnimation() {
-    if (this.fishAnimationInterval) return;
-
-    const SPEED = this.fish.speed || DIFFICULTY_TO_FISH_SPEED[this.difficulty]; // fallback to medium
-    const MIN_POS = 0;
-    const MAX_POS = FISH_MAX_POS;
-
-    this.fishSimulatedPosition = this.fish.lastSwapPosition || MAX_POS / 2;
-    this.fishSimulatedDirection = this.fish.direction || 'up';
-
-    this.fishAnimationInterval = setInterval(() => {
-      const now = Date.now();
-      const delta = this.fishSimulatedDirection === 'up' ? 1 : -1;
-      const movement = delta * SPEED * 1; // 75ms tick (sync with server polling)
-
-      let newPos = this.fishSimulatedPosition + movement;
-
-      // Clamp position and reverse direction
-      if (newPos > MAX_POS) {
-        newPos = MAX_POS;
-        this.fishSimulatedDirection = 'down';
-      } else if (newPos < MIN_POS) {
-        newPos = MIN_POS;
-        this.fishSimulatedDirection = 'up';
-      }
-
-      this.fishSimulatedPosition = newPos;
-
-      // Update fish object passed to BaseFish
-      this.fish = {
-        ...this.fish,
-        lastSwapPosition: newPos,
-        lastSwapAt: now,
-        direction: this.fishSimulatedDirection,
-      };
-    }, GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY); // 75ms
-  },
-
-
-    async startPolling() {
-      
-        try {
-          let url = `http://localhost:8081/get_mini_game_info`;
-
-          const res = await fetch(url)
-          if (!res.ok) throw new Error('Network response not ok')
+    async get_mini_game_info() {
+      try {
+        const res = await fetch('http://localhost:8081/get_mini_game_info')
+        if (res.ok) {
           const data = await res.json()
-          if (data.catchBar) this.processCatchBarInfo(data.catchBar)
-          if (data.fish) this.processFishInfo(data.fish)
-          if (data.progressBar) this.processProgressBarInfo(data.progressBar)
-        } catch (err) {
-          console.error('Polling error:', err)
+          console.log('Minigame info:', data)
+          this.processCatchBarInfo(data.catchBarInfo)
+          this.processFishInfo(data.fishInfo)
+          this.processProgressBarInfo(data.progressBarInfo)
         }
+      } catch (error) {
+        console.error('Error getting minigame info:', error)
+      }
+    },
+    startPolling() {
+      if (this.timer) return; // evita múltiples timers
+      this.timer = setInterval(() => {
+        this.get_mini_game_info()
+      }, GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY)
+    },
+    stopPolling() {
+      if (this.timer) {
+        clearInterval(this.timer)
+        this.timer = null
+      }
     },
     processCatchBarInfo(info) {
-      this.catchBar = {
-        direction: info.direction,
-        lastSwapAt: info.lastSwapAt,
-        lastSwapPosition: info.lastSwapPosition
-      }
+      this.catchBar.direction = info.direction
+      this.catchBar.lastSwapAt = info.lastSwapAt
+      this.catchBar.lastSwapPosition = info.lastSwapPosition
     },
     processFishInfo(info) {
-      this.fish = {
-        direction: info.direction,
-        lastSwapAt: info.lastSwapAt,
-        lastSwapPosition: info.lastSwapPosition,
-        speed: DIFFICULTY_TO_FISH_SPEED[this.difficulty] || 1,
-        isLegend: this.difficulty === 'legend'
-      }
+      this.fish.direction = info.direction
+      this.fish.lastSwapAt = info.lastSwapAt
+      this.fish.lastSwapPosition = info.lastSwapPosition
     },
     processProgressBarInfo(info) {
       if (info.state !== 'in_progress') {
-        this.$emit('finished', info.state === 'success')
-        clearInterval(this.interval)
-        this.interval = null
+        this.$emit('finished', info.state === 'successful')
+        this.stopPolling()
       } else {
-        this.progress = {
-          direction: info.direction,
-          lastSwapAt: info.lastSwapAt,
-          lastSwapPosition: info.lastSwapPosition
-        }
+        this.progress.direction = info.direction
+        this.progress.lastSwapAt = info.lastSwapAt
+        this.progress.lastSwapPosition = info.lastSwapPosition
+        this.spoolRotationType = info.direction === 'up' ? 'clockwise' : 'anticlockwise'
       }
     }
   },
-  beforeUnmount() {
-    clearInterval(this.interval)
+  mounted() {
+    if (this.visible) {
+      this.startPolling()
+    }
+  },
+  beforeDestroy() {
+    this.stopPolling()
   }
 }
 </script>
