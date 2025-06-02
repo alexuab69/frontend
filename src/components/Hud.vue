@@ -1,153 +1,180 @@
 <template>
-  <BaseCaptures>
-    <template #default>
-      <BaseAttempt
-        v-for="(attempt, index) in attempts"
-        :key="index"
-        :difficulty="attempt.difficulty"
-        :successful="attempt.successful"
-      />
-    </template>
-  </BaseCaptures>
+  <div>
+    <BaseCaptures>
+      <template #default>
+        <BaseAttempt
+          v-for="(attempt, index) in attempts"
+          :key="index"
+          :difficulty="attempt.difficulty"
+          :successful="attempt.successful"
+        />
+      </template>
+    </BaseCaptures>
 
-  <Minigame
-    :visible="isMinigameVisible"
-    :difficulty="minigameDifficulty"
-    @finished="onMinigameFinished"
-  />
+    <CaughtFishDialog
+      v-if="showCaughtFish"
+      :difficulty="lastCapturedDifficulty"
+    />
 
-  <CaughtFishDialog
-    v-if="showCaughtFish"
-    :difficulty="minigameDifficulty"
-  />
+    <BaseYellowIndicator :showTrigger="yellowIndicatorTrigger" />
 
-  <BaseYellowIndicator :showTrigger="yellowIndicatorTrigger" />
+    <Minigame
+      :visible="minigameVisible"
+      :difficulty="lastCapturedDifficulty"
+      @finished="onMinigameFinished"
+    />
 
-  <BaseActionButton
-    :text="actionButtonText"
-    :disabled="isActionButtonDisabled"
-    @click="onActionButtonClick"
-    @pressed="onActionButtonPressed"
-    @released="onActionButtonReleased"
-  />
+    <BaseActionButton
+      :text="actionButtonText"
+      :disabled="actionButtonDisabled"
+      @click="handleActionButtonClick"
+      @pressed="handleButtonPressed"
+      @released="handleButtonReleased"
+    />
+  </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import BaseCaptures from '../base_components/BaseCaptures.vue'
-import BaseAttempt from '../base_components/BaseAttempt.vue'
-import BaseYellowIndicator from '../base_components/BaseYellowIndicator.vue'
-import BaseActionButton from '../base_components/BaseActionButton.vue'
-import CaughtFishDialog from './CaughtFishDialog.vue'
+import { ref } from 'vue'
+import BaseCaptures from '@/base_components/BaseCaptures.vue'
+import BaseAttempt from '@/base_components/BaseAttempt.vue'
+import BaseYellowIndicator from '@/base_components/BaseYellowIndicator.vue'
+import BaseActionButton from '@/base_components/BaseActionButton.vue'
 import Minigame from './Minigame.vue'
-import { PULL_ROD_TIMEOUT_MS, DIFFICULTY_TO_FISH_TYPE, ATTEMPTS_DIFFICULTY } from '../../public/globals.js'
-// Props (triggers)
-const props = defineProps({
-  enableActionButtonTrigger: Number,
-  showCaughtFishTrigger: Number,
-})
+import CaughtFishDialog from './CaughtFishDialog.vue'
+import {
+  DIFFICULTY_TO_FISH_TYPE,
+  PULL_ROD_TIMEOUT_MS,
+  ATTEMPTS_DIFFICULTY
+} from '../../public/globals'
+import { enableActionButtonTrigger, showCaughtFishTrigger } from './App.vue'
 
-// Emits
 const emit = defineEmits(['setPlayerState', 'setCapturedFish'])
 
-// Estado interno
+const minigameVisible = ref(false)
 const actionButtonText = ref('cast')
-const isActionButtonDisabled = ref(false)
-const isMinigameVisible = ref(false)
+const actionButtonDisabled = ref(false)
 const showCaughtFish = ref(false)
 const yellowIndicatorTrigger = ref(0)
 const attempts = ref([])
-const minigameDifficulty = ref('')
+const lastCapturedDifficulty = ref('')
+let biteTimeout = null
 
-// Watchers para triggers
-watch(() => props.enableActionButtonTrigger, () => {
-  isActionButtonDisabled.value = false
+// Reactively update actionButtonDisabled when enableActionButtonTrigger changes
+watchEffect(() => {
+  if (enableActionButtonTrigger.value) {
+    actionButtonDisabled.value = false
+  }
 })
 
-watch(() => props.showCaughtFishTrigger, () => {
-  showCaughtFish.value = true
+// Reactively show caught fish dialog when trigger changes
+watchEffect(() => {
+  if (showCaughtFishTrigger.value) {
+    showCaughtFish.value = true
+  }
 })
 
-// Manejadores de eventos
-function onMinigameFinished(success) {
-  isMinigameVisible.value = false
+const handleActionButtonClick = async () => {
+  if (minigameVisible.value || actionButtonDisabled.value) return
+  debugger
+  switch (actionButtonText.value.toLowerCase()) {
+    case 'cast':
+      showCaughtFish.value = false
+      await castLine()
+      break
+
+    case 'start':
+      await reelIn()
+      break
+
+    case 'retry':
+      showCaughtFish.value = false
+      attempts.value = []
+      emit('setCapturedFish', '')
+      actionButtonText.value = 'CAST'
+      break
+  }
+}
+
+const castLine = async () => {
+  const res = await fetch('/cast_line')
+  if (res.ok) {
+    emit('setPlayerState', 'casting')
+    actionButtonText.value = 'START'
+    actionButtonDisabled.value = true
+    await waitForBite()
+  }
+}
+
+const waitForBite = async () => {
+  const res = await fetch('/wait_for_bite')
+  if (res.ok) {
+    yellowIndicatorTrigger.value++
+    if (biteTimeout) clearTimeout(biteTimeout)
+    biteTimeout = setTimeout(() => {
+      if (!minigameVisible.value) {
+        emit('setPlayerState', 'reeling_in')
+        emit('setCapturedFish', '')
+        actionButtonText.value = 'CAST'
+        actionButtonDisabled.value = true
+      }
+    }, PULL_ROD_TIMEOUT_MS)
+  }
+}
+
+const reelIn = async () => {
+  const res = await fetch('/reel_in')
+  const data = await res.json()
+
+  if (!res.ok && data.errorCode === 'standing') {
+    emit('setPlayerState', 'reeling_in')
+    emit('setCapturedFish', '')
+    actionButtonText.value = 'CAST'
+    actionButtonDisabled.value = true
+    return
+  }
+
+  if (data.difficulty) {
+    minigameVisible.value = true
+    lastCapturedDifficulty.value = data.difficulty
+    emit('setPlayerState', 'playing')
+    actionButtonText.value = 'PULL'
+    actionButtonDisabled.value = false
+  }
+}
+
+const handleButtonPressed = async () => {
+  if (minigameVisible.value) {
+    await fetch('/move_catch_bar_up')
+  }
+}
+
+const handleButtonReleased = async () => {
+  if (minigameVisible.value) {
+    await fetch('/stop_moving_catch_bar_up')
+  }
+}
+
+const onMinigameFinished = (successful) => {
+  minigameVisible.value = false
   emit('setPlayerState', 'reeling_in')
-  emit('setCapturedFish', success ? DIFFICULTY_TO_FISH_TYPE[minigameDifficulty.value] : '')
-  actionButtonText.value = 'cast'
-  isActionButtonDisabled.value = true
+
+  const fishId = successful
+    ? DIFFICULTY_TO_FISH_TYPE[lastCapturedDifficulty.value]
+    : ''
+  emit('setCapturedFish', fishId)
+
+  actionButtonText.value = 'CAST'
+  actionButtonDisabled.value = true
 
   attempts.value.push({
-    difficulty: minigameDifficulty.value,
-    successful: success
+    difficulty: lastCapturedDifficulty.value,
+    successful,
   })
 
   if (attempts.value.length >= ATTEMPTS_DIFFICULTY.length) {
-    actionButtonText.value = 'retry'
-  }
-}
-
-async function onActionButtonClick() {
-  if (isActionButtonDisabled.value || isMinigameVisible.value) return
-
-  if (actionButtonText.value === 'cast') {
-    showCaughtFish.value = false
-
-    const response = await fetch('/cast_line')
-    if (response.ok) {
-      emit('setPlayerState', 'casting')
-      actionButtonText.value = 'start'
-      isActionButtonDisabled.value = true
-
-      const waitRes = await fetch('/wait_for_bite')
-      if (waitRes.ok) {
-        yellowIndicatorTrigger.value++
-
-        setTimeout(() => {
-          if (!isMinigameVisible.value) {
-            emit('setPlayerState', 'reeling_in')
-            emit('setCapturedFish', '')
-            actionButtonText.value = 'cast'
-            isActionButtonDisabled.value = true
-          }
-        }, PULL_ROD_TIMEOUT_MS)
-      }
-    }
-  }
-
-  else if (actionButtonText.value === 'start') {
-    const response = await fetch('/reel_in')
-    const data = await response.json()
-
-    if (data.errorCode === 'standing') {
-      emit('setPlayerState', 'reeling_in')
-      emit('setCapturedFish', '')
-      actionButtonText.value = 'cast'
-      isActionButtonDisabled.value = true
-    } else if (data.difficulty) {
-      emit('setPlayerState', 'playing')
-      isMinigameVisible.value = true
-      minigameDifficulty.value = data.difficulty
-      actionButtonText.value = 'pull'
-    }
-  }
-
-  else if (actionButtonText.value === 'retry') {
-    showCaughtFish.value = false
-    attempts.value = []
-    emit('setCapturedFish', '')
-    actionButtonText.value = 'cast'
-  }
-}
-
-function onActionButtonPressed() {
-  if (isMinigameVisible.value) {
-    fetch('/move_catch_bar_up')
-  }
-}
-
-function onActionButtonReleased() {
-  if (isMinigameVisible.value) {
-    fetch('/stop_moving_catch_bar_up')
+    actionButtonText.value = 'RETRY'
+    actionButtonDisabled.value = false
   }
 }
 </script>

@@ -14,41 +14,69 @@
   />
 </template>
 
-<script setup>
-import { ref } from 'vue'
+<script>
+import { ref } from 'vue';
 
 // Componentes base
 import BaseBackground from '../base_components/BaseBackground.vue'
 import BasePlayer from '../base_components/BasePlayer.vue'
 
 // Componentes propios
-import Hud from '../components/Hud.vue'
+import Hud from './Hud.vue'
 
-// Estado del jugador
-const playerState = ref('standing')
-const capturedFish = ref('')
 
 // Triggers reactivos para el componente Hud
-const enableActionButtonTrigger = ref(0)
-const showCaughtFishTrigger = ref(0)
+export const enableActionButtonTrigger = ref(0)
+export const showCaughtFishTrigger = ref(0)
 
-// Eventos emitidos por BasePlayer
-function onAnimationFinished() {
-  enableActionButtonTrigger.value++
-}
+export default {
+  name: 'App',
+  components: {
+    BaseBackground,
+    BasePlayer,
+    Hud
+  },
 
-function onShowingCaughtFish() {
-  showCaughtFishTrigger.value++
-}
+  setup() {
+    // Estado del jugador
+    const playerState = ref('standing')
+    const capturedFish = ref('')
 
-// Eventos emitidos por Hud
-function onSetPlayerState(newState) {
-  playerState.value = newState
-}
+    // Triggers for Hud component
+    //const enableActionButtonTrigger = ref(0);
+    //const showCaughtFishTrigger = ref(0);
 
-function onSetCapturedFish(fishId) {
-  capturedFish.value = fishId
-}
+    // Called when BasePlayer emits animationFinished
+    function onAnimationFinished() {
+      enableActionButtonTrigger.value++
+    }
+
+    function onShowingCaughtFish() {
+      showCaughtFishTrigger.value++;
+    }
+
+    // Called when Hud emits new player state
+    function onSetPlayerState(newState) {
+      playerState.value = newState;
+    }
+
+    // Called when Hud emits new captured fish id
+    function onSetCapturedFish(fishId) {
+      capturedFish.value = fishId;
+    }
+
+    return {
+      playerState,
+      capturedFish,
+      enableActionButtonTrigger,
+      showCaughtFishTrigger,
+      onAnimationFinished,
+      onShowingCaughtFish,
+      onSetPlayerState,
+      onSetCapturedFish
+    };
+  }
+};
 </script>
 
 <style>
