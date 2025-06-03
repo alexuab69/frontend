@@ -152,7 +152,7 @@ const handleButtonReleased = async () => {
 
 const onMinigameFinished = (successful) => {
   minigameVisible.value = false
-  emit('setPlayerState', 'standing')
+  emit('setPlayerState', 'reeling_in')
 
   const fishId = successful
     ? DIFFICULTY_TO_FISH_TYPE[lastCapturedDifficulty.value]
