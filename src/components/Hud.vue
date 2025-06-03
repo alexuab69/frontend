@@ -11,10 +11,22 @@
       </template>
     </BaseCaptures>
 
-    <CaughtFishDialog
+    <BaseCaughtFishDialog
       v-if="showCaughtFish"
-      :difficulty="lastCapturedDifficulty"
-    />
+      :fishType="lastCapturedFish"
+    >
+      <template #fishName>
+        {{ fishName }}
+      </template>
+
+      <template #fishInchesLabel>
+        Length:
+      </template>
+
+      <template #fishInches>
+        {{ fishLength }}
+      </template>
+    </BaseCaughtFishDialog>
 
     <BaseYellowIndicator :showTrigger="yellowIndicatorTrigger" />
 
@@ -41,13 +53,16 @@ import BaseAttempt from '@/base_components/BaseAttempt.vue'
 import BaseYellowIndicator from '@/base_components/BaseYellowIndicator.vue'
 import BaseActionButton from '@/base_components/BaseActionButton.vue'
 import Minigame from './Minigame.vue'
-import CaughtFishDialog from './CaughtFishDialog.vue'
 import {
   DIFFICULTY_TO_FISH_TYPE,
   PULL_ROD_TIMEOUT_MS,
-  ATTEMPTS_DIFFICULTY
+  ATTEMPTS_DIFFICULTY,
+  DIFFICULTY_TO_FISH_NAME,
+  DIFFICULTY_TO_FISH_MIN_LENGTH,
+  DIFFICULTY_TO_FISH_MAX_LENGTH
 } from '../../public/globals'
 import { enableActionButtonTrigger, showCaughtFishTrigger } from './App.vue'
+import BaseCaughtFishDialog from '@/base_components/BaseCaughtFishDialog.vue'
 
 const emit = defineEmits(['setPlayerState', 'setCapturedFish'])
 
@@ -60,7 +75,11 @@ const showCaughtFish = ref(false)
 const yellowIndicatorTrigger = ref(0)
 const attempts = ref([])
 const lastCapturedDifficulty = ref('')
+let lastCapturedFish = ref('')
 let biteTimeout = null
+const fishName = ref('');
+const fishLength = ref('');
+
 
 watch(() => enableActionButtonTrigger.value, () => {
   actionButtonDisabled.value = false
@@ -85,6 +104,9 @@ const handleActionButtonClick = async () => {
 
     case 'retry':
       showCaughtFish.value = false
+      fishName.value = ''
+      fishLength.value = ''
+      lastCapturedFish = ''
       attempts.value = []
       emit('setCapturedFish', '')
       actionButtonText.value = 'cast'
@@ -154,10 +176,22 @@ const onMinigameFinished = (successful) => {
   minigameVisible.value = false
   emit('setPlayerState', 'reeling_in')
 
+  const difficulty = lastCapturedDifficulty.value
+
   const fishId = successful
-    ? DIFFICULTY_TO_FISH_TYPE[lastCapturedDifficulty.value]
+    ? DIFFICULTY_TO_FISH_TYPE[difficulty]
     : ''
   emit('setCapturedFish', fishId)
+
+  if(successful) {
+    fishName.value = DIFFICULTY_TO_FISH_NAME[difficulty]
+    const minLength = DIFFICULTY_TO_FISH_MIN_LENGTH[difficulty];
+    const maxLength = DIFFICULTY_TO_FISH_MAX_LENGTH[difficulty];
+    const randomLength = (Math.random() * (maxLength - minLength) + minLength).toFixed(1);
+    fishLength.value = `${randomLength} in`;
+    showCaughtFish.value = true
+    lastCapturedFish = DIFFICULTY_TO_FISH_TYPE[lastCapturedDifficulty.value]
+  }
 
   actionButtonText.value = 'cast'
   actionButtonDisabled.value = true
