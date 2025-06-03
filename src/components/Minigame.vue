@@ -86,8 +86,11 @@ export default {
         try {
           const data = JSON.parse(event.data)
           if (data.catchBarInfo) this.processCatchBarInfo(data.catchBarInfo)
+          else if(data.type === 'catchBarInfo') this.processCatchBarInfo(data.data)
           if (data.fishInfo) this.processFishInfo(data.fishInfo)
+          else if(data.type === 'fishInfo') this.processFishInfo(data.data)
           if (data.progressBarInfo) this.processProgressBarInfo(data.progressBarInfo)
+          else if(data.type === 'progressBarInfo') this.processProgressBarInfo(data.data)
         } catch (e) {
           console.error('Error parsing WebSocket message:', e)
         }
