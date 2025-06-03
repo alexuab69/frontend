@@ -3,7 +3,7 @@ import ProgressBar from './progress_bar.js';
 import CatchBar from './catch_bar.js';
 import Fish from './fish.js';
 
-function CatchingMinigame(finishCallback) {
+function CatchingMinigame(finishCallback, sendWebSocketMessage) {
   // inicializar variables locales, todas seran objetos
   let progressBar;
   let catchBar;
@@ -18,25 +18,33 @@ function CatchingMinigame(finishCallback) {
       progressBar = ProgressBar(velocidad, () => {
         fish.finish(); // Stop the fish's internal timer
         finishCallback(); // Signal the end of the mini-game
-      });
+      }, sendWebSocketMessage);
 
       // inicializar catchBar
       catchBar = CatchBar(() => {
-        progressBar.catchBarSwappedDirection(
-          catchBar.getInfo().direction,
-          catchBar.getInfo().lastSwapAt,
-          catchBar.getInfo().lastSwapPosition
-        );
-      });
+        const info = catchBar.getInfo();
+        progressBar.catchBarSwappedDirection(info.direction, info.lastSwapAt, info.lastSwapPosition);
 
-      // inicializar Fish
+        // WebSocket message
+        sendWebSocketMessage?.('catchBarInfo', {
+          direction: info.direction,
+          lastSwapAt: info.lastSwapAt,
+          lastSwapPosition: info.lastSwapPosition
+        });
+      }, sendWebSocketMessage);
+
       fish = Fish(velocidad, () => {
-        progressBar.fishSwappedDirection(
-          fish.getInfo().direction,
-          fish.getInfo().lastSwapAt,
-          fish.getInfo().lastSwapPosition
-        );
-      });
+        const info = fish.getInfo();
+        progressBar.fishSwappedDirection(info.direction, info.lastSwapAt, info.lastSwapPosition);
+
+        // WebSocket message
+        sendWebSocketMessage?.('fishInfo', {
+          direction: info.direction,
+          lastSwapAt: info.lastSwapAt,
+          lastSwapPosition: info.lastSwapPosition,
+          speed: velocidad
+        });
+      }, sendWebSocketMessage);
 
       // llamada a los metodos start de cada objeto
       progressBar.start();

@@ -1,12 +1,12 @@
 import { FISH_BIT_TIMEOUT_MS, PULL_ROD_TIMEOUT_MS, ATTEMPTS_DIFFICULTY } from './public/globals.js';
 import CatchingMinigame from './catching_minigame.js';
-function Game() {
+function Game(sendWebSocketMessage) {
   let playerState = "standing";
   let attemptNumber = 0;
   // Catching minigame. se inicializa llamando a CatchingMinigame. Su callback se ejecuta cuando minigame termina y devuelve el standing
   let catchingMinigame = CatchingMinigame(() => {
     playerState = "standing";
-  });
+  }, sendWebSocketMessage);
 
   // setTimeout que controlan cuando muerde y cuando escapa.
   let fishBiteTimer, fishEscapeTimer;

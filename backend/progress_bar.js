@@ -8,9 +8,7 @@ import {
   catchBarAndFishTouch,
 } from './public/globals.js';
 
-
-function ProgressBar(fishSpeed, finishCallback) {
-  // Local variables
+function ProgressBar(fishSpeed, finishCallback, sendWebSocketMessage) {
   let lastSwapPosition;
   let lastSwapAt;
   let direction;
@@ -21,34 +19,31 @@ function ProgressBar(fishSpeed, finishCallback) {
 
   return {
     start() {
-      // Inicializar variables
       lastSwapPosition = PROGRESS_BAR_INITIAL_POSITION;
       lastSwapAt = Date.now();
       direction = "down";
       state = "in_progress";
-      
-      // función que irá llamando el t1
+
       const updateState = () => {
-        if (direction === "up") {
-          state = "successful";
-        } else {
-          state = "failed";
-        }
+        state = direction === "up" ? "successful" : "failed";
         clearTimeout(t2);
         finishCallback();
+
+        sendWebSocketMessage?.('progressBarInfo', {
+          direction,
+          lastSwapAt,
+          lastSwapPosition,
+          state
+        });
       };
-    
-      // Función a ejecutar con t2
-      const checkInteractions = () => 
-        {
-        // Obtener la posición actual del catch bar
+
+      const checkInteractions = () => {
         const catchBarPosition = computeCatchBarCurrentPosition(
           catchBarInfo.direction,
           catchBarInfo.lastSwapAt,
           catchBarInfo.lastSwapPosition
         );
 
-        // Obtener la posicición del pez/cangrejo/lo que sea 
         const fishPosition = computeFishCurrentPosition(
           fishInfo.direction,
           fishInfo.lastSwapAt,
@@ -56,27 +51,25 @@ function ProgressBar(fishSpeed, finishCallback) {
           fishSpeed
         );
 
-        // Cuando la progress bar baje y tanto el pez como el catchbar se tocan:
-        // - Modificar lastSwapPosition
-        // - Cambiar de dirección
-        // - resetear el t1, que vaya llamando al update state y la frecuencia la dicta timeForProgressBarToReachLimit
         if (
           (direction === "down" && catchBarAndFishTouch(fishPosition, catchBarPosition)) ||
           (direction === "up" && !catchBarAndFishTouch(fishPosition, catchBarPosition))
         ) {
-          lastSwapPosition = computeProgressBarCurrentPosition(
-            direction,
-            lastSwapAt,
-            lastSwapPosition
-          );
+          lastSwapPosition = computeProgressBarCurrentPosition(direction, lastSwapAt, lastSwapPosition);
           direction = direction === "down" ? "up" : "down";
           lastSwapAt = Date.now();
+
+          sendWebSocketMessage?.('progressBarInfo', {
+            direction,
+            lastSwapAt,
+            lastSwapPosition,
+            state
+          });
 
           clearTimeout(t1);
           t1 = setTimeout(updateState, timeForProgressBarToReachLimit(direction, lastSwapPosition));
         }
-        // Reiniciar t2 
-        // clearTimeout(t2); // No estoy seguro
+
         t2 = setTimeout(checkInteractions, PROGRESS_BAR_TICK_FREQUENCY);
       };
 
@@ -84,16 +77,13 @@ function ProgressBar(fishSpeed, finishCallback) {
       t2 = setTimeout(checkInteractions, PROGRESS_BAR_TICK_FREQUENCY);
     },
 
-    // Se llama cada vez que el pez cambia de dirección
     fishSwappedDirection(fishDirection, fishLastSwapAt, fishLastSwapPosition) {
       fishInfo = { direction: fishDirection, lastSwapAt: fishLastSwapAt, lastSwapPosition: fishLastSwapPosition };
     },
 
-    // Se llama cada vez que el swapbar cambia de dirección
     catchBarSwappedDirection(catchBarDirection, catchBarLastSwapAt, catchBarLastSwapPosition) {
       catchBarInfo = { direction: catchBarDirection, lastSwapAt: catchBarLastSwapAt, lastSwapPosition: catchBarLastSwapPosition };
     },
-
 
     getInfo() {
       return {

@@ -3,6 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import express from 'express';
 import Game from './game.js'; // Import Game function
+import { WebSocketServer } from 'ws';
+import http from 'http';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,12 +12,35 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8081;
 
+
 app.use(cors());
 app.use(express.json());
-const publicFolder = path.join(__dirname, '/public');
-app.use(express.static(publicFolder));
+app.use(express.static(path.join(__dirname, '/public')));
 
-const game = Game(); // Initialize the Game instance
+let connectedClient = null;
+const sendWebSocketMessage = (type, data) => {
+    if (connectedClient && connectedClient.readyState === 1) {
+        connectedClient.send(JSON.stringify({ type, data }));
+    }
+};
+
+const game = Game(sendWebSocketMessage);
+
+const server = http.createServer(app);
+server.listen(PORT, () => {
+    console.log(`App listening on port ${PORT}!`);
+});
+
+const wss = new WebSocketServer({ port: 8080 });
+wss.on('connection', (ws) => {
+    console.log('WebSocket client connected!');
+    connectedClient = ws;
+    ws.on('close', () => {
+        console.log('WebSocket client disconnected!');
+        connectedClient = null;
+    });
+});
+
 
 // Endpoint: /cast_line
 app.get('/cast_line', (req, res) => {
@@ -66,6 +91,4 @@ app.get('/stop_moving_catch_bar_up', (req, res) => {
     res.sendStatus(200);
 });
 
-app.listen(PORT, () => {
-    console.log(`App listening on port ${PORT}!`);
-});
+

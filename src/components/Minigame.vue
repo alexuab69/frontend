@@ -23,17 +23,14 @@
 <script>
 import BaseMinigame from '@/base_components/BaseMinigame.vue'
 import BaseCatchBar from '@/base_components/BaseCatchBar.vue'
-import BaseFish from '@/base_components/BaseFish.vue'
+import BaseFish from '@/base_components/BaseFish.vue' 
 import BaseProgressBar from '@/base_components/BaseProgressBar.vue'
 import {
   FISH_MAX_POS,
-  GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY, 
   DIFFICULTY_TO_FISH_TYPE, 
   DIFFICULTY_TO_FISH_SPEED,
 } from '../../public/globals'
 import { onBeforeUnmount } from 'vue'
-
-
 
 export default {
   name: 'Minigame',
@@ -59,43 +56,58 @@ export default {
         isLegend: DIFFICULTY_TO_FISH_TYPE[this.difficulty] == 'legend'
       },
       progress: { direction: '', lastSwapAt: 0, lastSwapPosition: 0 },
-      timer: null,
+      ws: null,  // guardamos la instancia WebSocket
+      wsConnected: false,
     }
   },
   watch: {
-    visible() {
-      if (this.visible) {
+    visible(newVal) {
+      if (newVal) {
         this.fish.speed = DIFFICULTY_TO_FISH_SPEED[this.difficulty]
         this.fish.isLegend = DIFFICULTY_TO_FISH_TYPE[this.difficulty] == 'legend'
-        this.startPolling()
-      } else if (!this.visible) {
-        this.stopPolling()
+        this.openWebSocket()
+      } else {
+        this.closeWebSocket()
       }
     }
   },
   methods: {
-    async get_mini_game_info() {
-      try {
-        const res = await fetch('http://localhost:8081/get_mini_game_info')
-        if (res.ok) {
-          const data = await res.json()
-          this.processCatchBarInfo(data.catchBarInfo)
-          this.processFishInfo(data.fishInfo)
-          this.processProgressBarInfo(data.progressBarInfo)
+    openWebSocket() {
+      if (this.ws) return // ya abierto
+
+      this.ws = new WebSocket('ws://localhost:8080')
+
+      this.ws.onopen = () => {
+        console.log('WebSocket connected')
+        this.wsConnected = true
+      }
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.catchBarInfo) this.processCatchBarInfo(data.catchBarInfo)
+          if (data.fishInfo) this.processFishInfo(data.fishInfo)
+          if (data.progressBarInfo) this.processProgressBarInfo(data.progressBarInfo)
+        } catch (e) {
+          console.error('Error parsing WebSocket message:', e)
         }
-      } catch (error) {
-        console.error('Error getting minigame info:', error)
+      }
+
+      this.ws.onerror = (err) => {
+        console.error('WebSocket error:', err)
+      }
+
+      this.ws.onclose = () => {
+        console.log('WebSocket disconnected')
+        this.wsConnected = false
+        this.ws = null
       }
     },
-    startPolling() {
-      this.timer = setInterval(async () => {
-        this.get_mini_game_info()
-      }, GET_MINI_GAME_INFO_RETRIEVE_FREQUENCY)
-    },
-    stopPolling() {
-      if (this.timer) {
-        clearInterval(this.timer)
-        this.timer = null
+    closeWebSocket() {
+      if (this.ws) {
+        this.ws.close()
+        this.ws = null
+        this.wsConnected = false
       }
     },
     processCatchBarInfo(info) {
@@ -109,10 +121,9 @@ export default {
       this.fish.lastSwapPosition = info.lastSwapPosition
     },
     processProgressBarInfo(info) {
-      console.log('Progress Bar Info:', info)
       if (info.state !== 'in_progress') {
         this.$emit('finished', info.state === 'successful')
-        this.stopPolling()
+        this.closeWebSocket()
       } else {
         this.progress.direction = info.direction
         this.progress.lastSwapAt = info.lastSwapAt
@@ -123,11 +134,12 @@ export default {
   },
   mounted() {
     if (this.visible) {
-      this.startPolling()
+      this.openWebSocket()
     }
   },
-  onBeforeUnmount() {
-    this.stopPolling()
+  beforeUnmount() {
+    this.closeWebSocket()
   }
 }
 </script>
+

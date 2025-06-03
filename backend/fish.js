@@ -1,6 +1,6 @@
 import { FISH_MAX_POS, computeFishCurrentPosition, computeFishTimeToNextSwap } from './public/globals.js';
 
-function Fish(speed, swappedDirectionCallback) {
+function Fish(speed, swappedDirectionCallback, sendWebSocketMessage) {
   // Local variables
   let lastSwapPosition;
   let lastSwapAt;
@@ -15,6 +15,13 @@ function Fish(speed, swappedDirectionCallback) {
       direction = "down";
       swappedDirectionCallback();
 
+      sendWebSocketMessage?.('fishInfo', {  
+        direction,
+        lastSwapAt,
+        lastSwapPosition,
+        speed
+      });
+
       const swapDirection = () => {
         // Update the current position
         lastSwapPosition = computeFishCurrentPosition(direction, lastSwapAt, lastSwapPosition, speed);
@@ -23,6 +30,13 @@ function Fish(speed, swappedDirectionCallback) {
         // Swap direction
         direction = direction === "down" ? "up" : "down";
         swappedDirectionCallback();
+        sendWebSocketMessage?.('fishInfo', {
+          direction,
+          lastSwapAt,
+          lastSwapPosition,
+          speed
+        });
+
 
         // Start a new timer
         const nextSwapTime = computeFishTimeToNextSwap(direction, lastSwapPosition, speed);
